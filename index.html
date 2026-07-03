@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>URBEX DATABASE // Classified Field Archive</title>
+
+<!-- ===== Fonts =====
+     Chakra Petch  -> display / headings (angular, technical)
+     Rajdhani      -> UI / body copy (condensed, readable at small sizes)
+     Share Tech Mono -> data readouts, coordinates, stat labels -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+<!-- ===== Leaflet (open-source map engine, no API key required) =====
+     Google Maps JS API requires a billing-enabled API key that can't be
+     provisioned here, so this build uses Leaflet + a dark CARTO tile set
+     to achieve the same full-screen, dark-themed, pannable/zoomable map.
+     See the top of script.js for a note on swapping in Google Maps later. -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ======================================================================
+     INTRO SEQUENCE — full-screen boot / satellite-uplink animation
+     ====================================================================== -->
+<div id="intro" class="intro">
+  <div class="intro__grid"></div>
+  <canvas id="intro-particles" class="intro__particles"></canvas>
+
+  <div class="intro__scope">
+    <div class="scope-ring scope-ring--outer"></div>
+    <div class="scope-ring scope-ring--mid"></div>
+    <div class="scope-ring scope-ring--inner"></div>
+    <div class="scope-sweep"></div>
+    <div class="scope-cross scope-cross--h"></div>
+    <div class="scope-cross scope-cross--v"></div>
+  </div>
+
+  <div class="intro__content">
+    <div class="intro__eyebrow">SATELLITE UPLINK ESTABLISHED</div>
+    <h1 class="intro__title" data-text="URBEX DATABASE">URBEX DATABASE</h1>
+    <div class="intro__subtitle">CLASSIFIED FIELD ARCHIVE &nbsp;/&nbsp; CLEARANCE REQUIRED</div>
+    <div class="intro__readout" id="intro-readout">INITIALIZING &nbsp;&middot;&nbsp; 00%</div>
+    <div class="intro__loadbar"><div class="intro__loadbar-fill" id="intro-loadbar-fill"></div></div>
+  </div>
+
+  <div class="intro__corner intro__corner--tl"></div>
+  <div class="intro__corner intro__corner--tr"></div>
+  <div class="intro__corner intro__corner--bl"></div>
+  <div class="intro__corner intro__corner--br"></div>
+</div>
+
+<!-- ======================================================================
+     MAIN APPLICATION
+     ====================================================================== -->
+<div id="app" class="app">
+
+  <!-- ---------- Map layer (full bleed background) ---------- -->
+  <div id="map" class="map"></div>
+  <div class="map__vignette"></div>
+
+  <!-- ---------- Top bar ---------- -->
+  <header class="topbar glass">
+    <button id="sidebar-toggle" class="icon-btn" aria-label="Toggle sidebar" title="Toggle menu">
+      <span class="icon-btn__bar"></span>
+      <span class="icon-btn__bar"></span>
+      <span class="icon-btn__bar"></span>
+    </button>
+
+    <div class="topbar__brand">
+      <span class="topbar__brand-mark">◈</span>
+      <div class="topbar__brand-text">
+        <span class="topbar__title">URBEX</span>
+        <span class="topbar__subtitle">FIELD ARCHIVE // EU SECTOR</span>
+      </div>
+    </div>
+
+    <div class="topbar__search">
+      <svg class="topbar__search-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="7"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input id="search-input" class="topbar__search-input" type="text" placeholder="SEARCH LOCATION DESIGNATION..." autocomplete="off">
+      <div id="search-results" class="search-results"></div>
+    </div>
+
+    <div class="topbar__counter" id="waypoint-counter">
+      <span class="topbar__counter-value" id="counter-value">0</span>
+      <span class="topbar__counter-label">/ <span id="counter-total">0</span> SITES ACTIVE</span>
+    </div>
+  </header>
+
+  <!-- ---------- Sidebar ---------- -->
+  <aside id="sidebar" class="sidebar glass">
+    <div class="sidebar__section">
+      <h2 class="sidebar__heading">Classification Filter</h2>
+      <div class="filters" id="filters">
+        <button class="filter-btn filter-btn--red is-active" data-rating="red">
+          <span class="filter-btn__dot filter-btn__dot--red"></span>
+          Excellent
+        </button>
+        <button class="filter-btn filter-btn--yellow is-active" data-rating="yellow">
+          <span class="filter-btn__dot filter-btn__dot--yellow"></span>
+          Average
+        </button>
+        <button class="filter-btn filter-btn--blue is-active" data-rating="blue">
+          <span class="filter-btn__dot filter-btn__dot--blue"></span>
+          Minor Ruins
+        </button>
+      </div>
+    </div>
+
+    <div class="sidebar__section">
+      <h2 class="sidebar__heading">Legend</h2>
+      <ul class="legend">
+        <li class="legend__item"><span class="legend__dot legend__dot--red"></span> Excellent location — highly recommended</li>
+        <li class="legend__item"><span class="legend__dot legend__dot--yellow"></span> Average location</li>
+        <li class="legend__item"><span class="legend__dot legend__dot--blue"></span> Small ruins / low interest</li>
+      </ul>
+    </div>
+
+    <div class="sidebar__section sidebar__section--grow">
+      <h2 class="sidebar__heading">Site Index</h2>
+      <div id="waypoint-list" class="waypoint-list"><!-- populated by script.js --></div>
+    </div>
+
+    <div class="sidebar__footer">
+      <span class="sidebar__footer-blink"></span>
+      SIGNAL ENCRYPTED &middot; ARCHIVE v1.0
+    </div>
+  </aside>
+
+  <!-- ---------- Dossier panel (waypoint detail) ---------- -->
+  <div id="dossier-overlay" class="dossier-overlay"></div>
+  <section id="dossier" class="dossier glass">
+    <button id="dossier-close" class="dossier__close" aria-label="Close dossier">&times;</button>
+
+    <div class="dossier__corner dossier__corner--tl"></div>
+    <div class="dossier__corner dossier__corner--tr"></div>
+    <div class="dossier__corner dossier__corner--bl"></div>
+    <div class="dossier__corner dossier__corner--br"></div>
+
+    <div class="dossier__scanline"></div>
+
+    <div class="dossier__content" id="dossier-content">
+      <!-- populated dynamically by script.js -->
+    </div>
+  </section>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
